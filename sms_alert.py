@@ -60,6 +60,11 @@ def good_morning():
 ids = 'ethereum,cardano,vechain,harmony,uniswap,solana,neo,algorand'
 # because of the coin_gecko API, we also need to do a little work to get the symbol
 id_list = ['ethereum', 'cardano', 'vechain', 'harmony', 'uniswap', 'solana', 'neo', 'algorand']
+# pct_chng set variable to check percent change
+pct_chng = 5.0
+# dlr_chng set variable to check a dollar change
+dlr_chng = 50.0
+
 sym = []
 # get coins from coin_gecko
 coins_list = cg.get_coins_list()
@@ -100,9 +105,13 @@ while run:
     n_coins = get_coins()
     
     # I'm interested in ETH, so I set a separate trigger (+/-$50) for ETH
-    if abs(n_coins['ethereum']['usd'] - coins['ethereum']['usd']) >= 50.00:
+    eth_chng = n_coins['ethereum']['usd'] - coins['ethereum']['usd']
+    if abs(eth_chng) >= dlr_chng:
         msg = parse_coins(n_coins)
-        sub = 'ETH Alert'
+        if eth_chng > 0:
+            sub = 'ETH Up'
+        else:
+            sub = 'ETH Down'
         send_alert(msg, sub)
         coins = get_coins()
         print('Compare price updated ' + str(now))
@@ -112,11 +121,14 @@ while run:
             p1 = coins[k]['usd']
             p2 = v['usd']
             pct = ((p2-p1)/p1)*100
-            # default threshold is +/- 5%
-            if abs(pct) >= 5.0:
+            # change pct_change to what you want to track
+            if abs(pct) >= pct_chng:
                 t = str(k)
                 msg = parse_coins(n_coins)
-                sub = symbol_dict[k] + ' Alert'
+                if pct > 0:
+                    sub = symbol_dict[k] + ' Up'
+                else:
+                    sub = symbol_dict[k] + ' Down'
                 send_alert(msg, sub)
                 coins = get_coins()
                 print(t + ' percent change ' + str(now))
