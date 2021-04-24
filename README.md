@@ -4,4 +4,16 @@ The easiest way is to create a GMail account for use with this program, and have
 
 If using GMail, you will have to enable insecure apps; there are several articles online for how to do that.
 
-Make sure you update the variables "id" and "id_list" with the cryptos in your watch list. 
+Make sure you update the following variables:
+* sender_address - your gmail address
+* receiver_address - your mobile phone number with your carrier's email gateway appended
+* account_password - your gmail address's password
+* ids - string of the cryptos in your watchlist
+* id_list - list of the cryptos in your watchlist
+* pct_chng - you will be alerted when a crypto in your watchlist moves by +/- this percent. Default = 5%
+* dlr_chng - alert you if a crypto (default is ETH) moves by +/- this amount in fiat. Default is 50 USD
+
+
+Future enhancements:
+* All-time high alerts
+* Alerts when a major support / resistance level is reached
