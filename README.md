@@ -17,3 +17,4 @@ Make sure you update the following variables:
 Future enhancements:
 * All-time high alerts
 * Alerts when a major support / resistance level is reached
+* "Quiet time" where you can set a time range to not send alerts
