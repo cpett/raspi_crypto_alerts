@@ -12,6 +12,11 @@ Make sure you update the following variables:
 * id_list - list of the cryptos in your watchlist
 * pct_chng - you will be alerted when a crypto in your watchlist moves by +/- this percent. Default = 5%
 * dlr_chng - alert you if a crypto (default is ETH) moves by +/- this amount in fiat. Default is 50 USD
+* alert_on_changes - True if you want to get alerts based on pct_chng/dlr_chng; False if you only want alerts at certain times throughout the day
+* alert_start_hour - hour when you want to receive a daily alert
+* alert_start_minute - minute when you want to receive a daily alert
+
+Note - alert_on_changes, alert_start_hour, and alert_start_minute are in preparation for a future iteration where you will be able to designate specific times to receive alerts
 
 
 Future enhancements:

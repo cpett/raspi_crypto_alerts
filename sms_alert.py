@@ -6,7 +6,37 @@ from datetime import datetime
 import collections
 cg = CoinGeckoAPI()
 
-# email information
+#####################################
+#### Configure your  alerts here ####
+#####################################
+
+# this first list is a list of coins on your watch list
+ids = 'ethereum,cardano,vechain,harmony,uniswap,solana,neo,algorand'
+# because of the coin_gecko API, we also need to do a little work to get the symbol
+id_list = ['ethereum', 'cardano', 'vechain', 'harmony', 'uniswap', 'solana', 'neo', 'algorand']
+
+# if this is true, you will be alerted on pct_chng and/or dlr_chng
+# set to False if you do not want price alerts
+alert_on_changes = True
+# pct_chng set variable to check percent change
+pct_chng = 5.0
+# dlr_chng set variable to check a dollar change
+dlr_chng = 50.0
+
+#####################################
+#### Configure alert frequency   ####
+#####################################
+# set the time each day you want at least 1 alert to trigger
+# default is 08:30-08:32 according to your system time
+alert_start_hour = 8
+alert_start_minute = 30
+# set how many times per day the alerts will be sent
+# TODO: time check logic
+# alerts_per_day = 4
+
+#####################################
+#### Email/SMS alert information ####
+#####################################
 sender_address = "enter_your_gmail_here" 
 receiver_address = "enter_your_phone_number_here@messaging.sprintpcs.com" 
 account_password = "enter_your_gmail_pswd_here" 
@@ -29,7 +59,6 @@ def send_alert(body, sub):
 
     server.sendmail(sender_address, receiver_address, text)
     server.quit()
-    print('email sent')
     
 # using coin_gecko, get the price of your watch list
 def get_coins():
@@ -43,27 +72,17 @@ def parse_coins(coins):
     msg = ""
     for k, v in coins.items():
         msg = msg + symbol_dict[k] + ": " + str(v['usd']) + "\n" 
-
     return(msg)
 
-# runs at a designated time each morning
-def good_morning():
+# Called when script starts and at a designated time(s)
+def coin_update():
     coins = get_coins()
     
     msg = parse_coins(coins)
-    sub = 'Good morning'
+    sub = 'Crypto Alert'
     send_alert(msg, sub)
 
     return(coins)
-
-# this first list is a list of coins on your watch list
-ids = 'ethereum,cardano,vechain,harmony,uniswap,solana,neo,algorand'
-# because of the coin_gecko API, we also need to do a little work to get the symbol
-id_list = ['ethereum', 'cardano', 'vechain', 'harmony', 'uniswap', 'solana', 'neo', 'algorand']
-# pct_chng set variable to check percent change
-pct_chng = 5.0
-# dlr_chng set variable to check a dollar change
-dlr_chng = 50.0
 
 sym = []
 # get coins from coin_gecko
@@ -83,57 +102,56 @@ for id in id_list:
 # run the alert program... always.
 run = True
 
+# trigger times for canned alert
+time1 = datetime.now().time()
+time1 = time1.replace(hour=alert_start_hour, minute=alert_start_minute, second=0, microsecond=0)
+time2 = datetime.now().time()
+time2 = time2.replace(hour=alert_start_hour, minute=alert_start_minute + 1, second=59, microsecond=0)
+# master_time1 = time1
+# master_time2 = time2
+
 # instantiate and send 1 alert when the script first starts
-coins = good_morning()
+coins = coin_update()
 print('coins instantiated')
 
-# set the time each day you want at least 1 alert to trigger
-time1 = datetime.now().time()
-# default is 08:30-08:32 according to your raspi
-time1 = time1.replace(hour=8, minute=30, second=0, microsecond=0)
-time2 = datetime.now().time()
-time2 = time2.replace(hour=8, minute=31, second=59, microsecond=0)
-
 while run:
-    # checks the daily trigger / good_morning time
+    # checks the daily trigger time
     now = datetime.now()
     if now.time() > time1 and now.time() < time2:
-        coins = good_morning()
-        print('good_morning sent at ' + str(now))
+        coins = coin_update()
+        print('Timed alert sent at ' + str(now))
     
-    # gets the price for your watch list for comparison
-    n_coins = get_coins()
-    
-    # I'm interested in ETH, so I set a separate trigger (+/-$50) for ETH
-    eth_chng = n_coins['ethereum']['usd'] - coins['ethereum']['usd']
-    if abs(eth_chng) >= dlr_chng:
-        msg = parse_coins(n_coins)
-        if eth_chng > 0:
-            sub = 'ETH Up'
+    # only send price-check alerts if set to True
+    if alert_on_changes:
+        # gets the price for your watch list for comparison
+        n_coins = get_coins()
+        # I'm tracking ETH, so I set a separate trigger (+/-$50) for ETH
+        eth_chng = n_coins['ethereum']['usd'] - coins['ethereum']['usd']
+        if abs(eth_chng) >= dlr_chng:
+            msg = parse_coins(n_coins)
+            if eth_chng > 0:
+                sub = 'ETH Up'
+            else:
+                sub = 'ETH Down'
+            send_alert(msg, sub)
+            coins = get_coins()
+            print('Compare price updated ' + str(now))
         else:
-            sub = 'ETH Down'
-        send_alert(msg, sub)
-        coins = get_coins()
-        print('Compare price updated ' + str(now))
-    else:
-        # all other alerts based on a percent change
-        for k, v in n_coins.items():
-            p1 = coins[k]['usd']
-            p2 = v['usd']
-            pct = ((p2-p1)/p1)*100
-            # change pct_change to what you want to track
-            if abs(pct) >= pct_chng:
-                t = str(k)
-                msg = parse_coins(n_coins)
-                if pct > 0:
-                    sub = symbol_dict[k] + ' Up'
-                else:
-                    sub = symbol_dict[k] + ' Down'
-                send_alert(msg, sub)
-                coins = get_coins()
-                print(t + ' percent change ' + str(now))
+            # all other alerts based on a percent change
+            for k, v in n_coins.items():
+                p1 = coins[k]['usd']
+                p2 = v['usd']
+                pct = ((p2-p1)/p1)*100
+                # change pct_change to what you want to track
+                if abs(pct) >= pct_chng:
+                    t = str(k)
+                    msg = parse_coins(n_coins)
+                    if pct > 0:
+                        sub = symbol_dict[k] + ' Up'
+                    else:
+                        sub = symbol_dict[k] + ' Down'
+                    send_alert(msg, sub)
+                    coins = get_coins()
+                    print(t + ' percent change ' + str(now))
     # time to pause/sleep before running again
-    time.sleep(100)
-    
-        
-        
+    time.sleep(100)        
