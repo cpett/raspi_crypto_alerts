@@ -14,6 +14,8 @@ cg = CoinGeckoAPI()
 ids = 'ethereum,cardano,vechain,harmony,uniswap,solana,neo,algorand'
 # because of the coin_gecko API, we also need to do a little work to get the symbol
 id_list = ['ethereum', 'cardano', 'vechain', 'harmony', 'uniswap', 'solana', 'neo', 'algorand']
+# if you want to track 1 crypto more closely than the others update this var
+main_id = 'ethereum'
 
 # if this is true, you will be alerted on pct_chng and/or dlr_chng
 # set to False if you do not want price alerts
@@ -84,6 +86,24 @@ def coin_update():
 
     return(coins)
 
+# calculate the pp, resistance, and support
+def calc_technicals(coin_id):
+    coin_tech = cg.get_coin_by_id(id=coin_id, vs_currencies='usd')
+    current = coin_tech['market_data']['current_price']['usd']
+    high = coin_tech['market_data']['high_24h']['usd']
+    low = coin_tech['market_data']['low_24h']['usd']
+    pivot_point = (current + high + low)/3
+    r1 = str(round(((2 * pivot_point) - low), 2))
+    s1 = str(round(((2 * pivot_point) - high), 2))
+    s2 = str(round((pivot_point - (high - low)), 2))
+    s3 = str(round((low - 2 * (high - pivot_point)), 2))
+    ath = str(coin_tech['market_data']['ath']['usd'])
+    ath_ch_pct = str(round(coin_tech['market_data']['ath_change_percentage']['usd'], 2))
+    
+    msg = 'Now: ' + str(current) + '\nHigh: ' + str(high) + '\nLow: ' + str(low) +'\nATH: ' + ath + '\nR1: ' + r1 + '\nS1: ' + s1 + '\nS2: ' + s2 + '\nS3: ' + s3
+    sub = symbol_dict[coin_id] + ' Stats'
+    send_alert(msg, sub)
+
 sym = []
 # get coins from coin_gecko
 coins_list = cg.get_coins_list()
@@ -110,15 +130,18 @@ time2 = time2.replace(hour=alert_start_hour, minute=alert_start_minute + 1, seco
 # master_time1 = time1
 # master_time2 = time2
 
+
 # instantiate and send 1 alert when the script first starts
 coins = coin_update()
 print('coins instantiated')
+calc_technicals(main_id)
 
 while run:
     # checks the daily trigger time
     now = datetime.now()
     if now.time() > time1 and now.time() < time2:
         coins = coin_update()
+        calc_technicals(main_id)
         print('Timed alert sent at ' + str(now))
     
     # only send price-check alerts if set to True
@@ -126,32 +149,28 @@ while run:
         # gets the price for your watch list for comparison
         n_coins = get_coins()
         # I'm tracking ETH, so I set a separate trigger (+/-$50) for ETH
-        eth_chng = n_coins['ethereum']['usd'] - coins['ethereum']['usd']
+        eth_chng = n_coins[main_id]['usd'] - coins[main_id]['usd']
         if abs(eth_chng) >= dlr_chng:
-            msg = parse_coins(n_coins)
-            if eth_chng > 0:
-                sub = 'ETH Up'
-            else:
-                sub = 'ETH Down'
-            send_alert(msg, sub)
-            coins = get_coins()
-            print('Compare price updated ' + str(now))
-        else:
-            # all other alerts based on a percent change
-            for k, v in n_coins.items():
-                p1 = coins[k]['usd']
-                p2 = v['usd']
-                pct = ((p2-p1)/p1)*100
-                # change pct_change to what you want to track
-                if abs(pct) >= pct_chng:
-                    t = str(k)
-                    msg = parse_coins(n_coins)
-                    if pct > 0:
-                        sub = symbol_dict[k] + ' Up'
-                    else:
-                        sub = symbol_dict[k] + ' Down'
-                    send_alert(msg, sub)
-                    coins = get_coins()
-                    print(t + ' percent change ' + str(now))
+            calc_technicals(main_id)
+            coins[main_id]['usd'] = n_coins[main_id]['usd']
+            print(main_id + ' technicals ' + str(now))
+            
+        # all other alerts based on a percent change
+        for k, v in n_coins.items():
+            p1 = coins[k]['usd']
+            p2 = v['usd']
+            pct = ((p2-p1)/p1)*100
+            # change pct_change to what you want to track
+            if abs(pct) >= pct_chng:
+                t = str(k)
+                msg = parse_coins(n_coins)
+                if pct > 0:
+                    sub = symbol_dict[k] + ' Up'
+                else:
+                    sub = symbol_dict[k] + ' Down'
+                send_alert(msg, sub)
+                print(t + ' percent change ' + str(now))
+                calc_technicals(k)
+                coins = get_coins()
     # time to pause/sleep before running again
-    time.sleep(100)        
+    time.sleep(100)
