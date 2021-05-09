@@ -2,7 +2,7 @@ import smtplib, time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pycoingecko import CoinGeckoAPI
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import collections
 cg = CoinGeckoAPI()
 
@@ -92,7 +92,14 @@ def calc_technicals(coin_id):
     current = coin_tech['market_data']['current_price']['usd']
     high = coin_tech['market_data']['high_24h']['usd']
     low = coin_tech['market_data']['low_24h']['usd']
-    pivot_point = (current + high + low)/3
+    
+    y = date.today() - timedelta(days=1)
+    y = y.strftime('%d-%m-%Y')
+    y = str(y)
+    close = cg.get_coin_history_by_id(coin_id, y)
+    close = close['market_data']['current_price']['usd']
+    
+    pivot_point = (close + high + low)/3
     r1 = str(round(((2 * pivot_point) - low), 2))
     s1 = str(round(((2 * pivot_point) - high), 2))
     s2 = str(round((pivot_point - (high - low)), 2))
