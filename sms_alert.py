@@ -92,7 +92,7 @@ def calc_technicals(coin_id):
     current = coin_tech['market_data']['current_price']['usd']
     high = coin_tech['market_data']['high_24h']['usd']
     low = coin_tech['market_data']['low_24h']['usd']
-    
+   
     y = date.today() - timedelta(days=1)
     y = y.strftime('%d-%m-%Y')
     y = str(y)
@@ -110,6 +110,7 @@ def calc_technicals(coin_id):
     msg = 'Now: ' + str(current) + '\nHigh: ' + str(high) + '\nLow: ' + str(low) +'\nATH: ' + ath + '\nR1: ' + r1 + '\nS1: ' + s1 + '\nS2: ' + s2 + '\nS3: ' + s3
     sub = symbol_dict[coin_id] + ' Stats'
     send_alert(msg, sub)
+    return(current)
 
 sym = []
 # get coins from coin_gecko
@@ -140,7 +141,8 @@ time2 = time2.replace(hour=alert_start_hour, minute=alert_start_minute + 1, seco
 
 # instantiate and send 1 alert when the script first starts
 coins = coin_update()
-print('coins instantiated')
+print('coins instantiated ' + str(datetime.now()))
+print(coins)
 calc_technicals(main_id)
 
 while run:
@@ -158,8 +160,8 @@ while run:
         # I'm tracking ETH, so I set a separate trigger (+/-$50) for ETH
         eth_chng = n_coins[main_id]['usd'] - coins[main_id]['usd']
         if abs(eth_chng) >= dlr_chng:
-            calc_technicals(main_id)
-            coins[main_id]['usd'] = n_coins[main_id]['usd']
+            current = calc_technicals(main_id)
+            coins[main_id]['usd'] = current
             print(main_id + ' technicals ' + str(now))
             
         # all other alerts based on a percent change
@@ -179,5 +181,6 @@ while run:
                 print(t + ' percent change ' + str(now))
                 calc_technicals(k)
                 coins = get_coins()
+
     # time to pause/sleep before running again
     time.sleep(100)
