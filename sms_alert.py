@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import smtplib, time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -11,9 +12,9 @@ cg = CoinGeckoAPI()
 #####################################
 
 # this first list is a list of coins on your watch list
-ids = 'ethereum,cardano,vechain,harmony,uniswap,solana,neo,algorand'
+ids = 'ethereum,cardano,vechain,harmony,uniswap,solana,polkadot,algorand,matic-network,tezos'
 # because of the coin_gecko API, we also need to do a little work to get the symbol
-id_list = ['ethereum', 'cardano', 'vechain', 'harmony', 'uniswap', 'solana', 'neo', 'algorand']
+id_list = ['ethereum', 'cardano', 'vechain', 'harmony', 'uniswap', 'solana', 'polkadot', 'algorand', 'matic-network', 'tezos']
 # if you want to track 1 crypto more closely than the others update this var
 main_id = 'ethereum'
 
@@ -52,20 +53,33 @@ def send_alert(body, sub):
     msg['Subject'] = sub
 
     msg.attach(MIMEText(body, 'plain'))
-    
-    server = smtplib.SMTP('smtp.gmail.com:587')
-    server.ehlo()
-    server.starttls()
-    server.login(sender_address,account_password)
-    text = msg.as_string()
 
-    server.sendmail(sender_address, receiver_address, text)
-    server.quit()
-    
+    try:
+        server = smtplib.SMTP('smtp.gmail.com:587')
+        server.ehlo()
+        server.starttls()
+        server.login(sender_address,account_password)
+        text = msg.as_string()
+
+        server.sendmail(sender_address, receiver_address, text)
+        server.quit()
+    except:
+        print('SMTP Error' + str(datetime.now()))
+        time.sleep(180)
+        sub = 'SMTPErr'
+        coins = coin_update(sub)
+
 # using coin_gecko, get the price of your watch list
 def get_coins():
-    coins = cg.get_price(ids=ids, vs_currencies='usd')
-    return(coins)
+    try:
+        coins = cg.get_price(ids=ids, vs_currencies='usd')
+        return(coins)
+    except:
+        print('CG API error ' + str(datetime.now()))
+        time.sleep(180)
+        sub = 'APIErr'
+        coins = coin_update(sub)
+        return(coins)
 
 # parse the coins to compose your alert
 def parse_coins(coins):
@@ -73,44 +87,61 @@ def parse_coins(coins):
 
     msg = ""
     for k, v in coins.items():
-        msg = msg + symbol_dict[k] + ": " + str(v['usd']) + "\n" 
+        price = v['usd']
+        price = round(price, 3)
+        msg = msg + symbol_dict[k] + ": " + str(price) + "\n"
     return(msg)
 
 # Called when script starts and at a designated time(s)
-def coin_update():
+def coin_update(sub):
     coins = get_coins()
-    
+
     msg = parse_coins(coins)
-    sub = 'Crypto Alert'
+    if len(sub) < 2:
+        sub = 'Alert'
+
     send_alert(msg, sub)
 
     return(coins)
 
 # calculate the pp, resistance, and support
-def calc_technicals(coin_id):
-    coin_tech = cg.get_coin_by_id(id=coin_id, vs_currencies='usd')
-    current = coin_tech['market_data']['current_price']['usd']
-    high = coin_tech['market_data']['high_24h']['usd']
-    low = coin_tech['market_data']['low_24h']['usd']
-   
-    y = date.today() - timedelta(days=1)
-    y = y.strftime('%d-%m-%Y')
-    y = str(y)
-    close = cg.get_coin_history_by_id(coin_id, y)
-    close = close['market_data']['current_price']['usd']
-    
-    pivot_point = (close + high + low)/3
-    r1 = str(round(((2 * pivot_point) - low), 2))
-    s1 = str(round(((2 * pivot_point) - high), 2))
-    s2 = str(round((pivot_point - (high - low)), 2))
-    s3 = str(round((low - 2 * (high - pivot_point)), 2))
-    ath = str(coin_tech['market_data']['ath']['usd'])
-    ath_ch_pct = str(round(coin_tech['market_data']['ath_change_percentage']['usd'], 2))
-    
-    msg = 'Now: ' + str(current) + '\nHigh: ' + str(high) + '\nLow: ' + str(low) +'\nATH: ' + ath + '\nR1: ' + r1 + '\nS1: ' + s1 + '\nS2: ' + s2 + '\nS3: ' + s3
-    sub = symbol_dict[coin_id] + ' Stats'
-    send_alert(msg, sub)
-    return(current)
+def calc_technicals(coin_id, sub):
+    try:
+        coin_tech = cg.get_coin_by_id(id=coin_id, vs_currencies='usd')
+        # current = coin_tech['market_data']['current_price']['usd']
+        current = cg.get_price(ids=coin_id, vs_currencies='usd')
+        current = current[coin_id]['usd']
+        high = coin_tech['market_data']['high_24h']['usd']
+        low = coin_tech['market_data']['low_24h']['usd']
+
+        y = date.today() - timedelta(days=1)
+        y = y.strftime('%d-%m-%Y')
+        y = str(y)
+        close = cg.get_coin_history_by_id(coin_id, y)
+        close = close['market_data']['current_price']['usd']
+
+        pivot_point = (close + high + low)/3
+        r1 = str(round(((2 * pivot_point) - low), 2))
+        r2 = str(round((pivot_point + (high - low)), 2))
+        r3 = str(round((high + (2 * (pivot_point - low))), 2))
+        s1 = str(round(((2 * pivot_point) - high), 2))
+        s2 = str(round((pivot_point - (high - low)), 2))
+        s3 = str(round((low - (2 * (high - pivot_point))), 2))
+        ath = str(coin_tech['market_data']['ath']['usd'])
+        # ath_ch_pct = str(round(coin_tech['market_data']['ath_change_percentage']['usd'], 2))
+
+        msg = str(current) + '\nHigh-' + str(high) + '\nLow-' + str(low) +'\nATH-' + ath
+        msg = msg + '\nR3-' + r3 + '\nR2-' + r2 + '\nR1-' + r1
+        msg = msg + '\nS1-' + s1 + '\nS2-' + s2 + '\nS3-' + s3
+        sub = symbol_dict[coin_id] + sub
+        send_alert(msg, sub)
+        return(current)
+    except:
+        print('CG API error ' + str(datetime.now()))
+        time.sleep(180)
+        sub = 'APIErr'
+        coins = coin_update(sub)
+        return(coins)
 
 sym = []
 # get coins from coin_gecko
@@ -140,19 +171,24 @@ time2 = time2.replace(hour=alert_start_hour, minute=alert_start_minute + 1, seco
 
 
 # instantiate and send 1 alert when the script first starts
-coins = coin_update()
+sub = 'Alert'
+coins = coin_update(sub)
 print('coins instantiated ' + str(datetime.now()))
 print(coins)
-calc_technicals(main_id)
+sub = ' '
+calc_technicals(main_id, sub)
 
 while run:
     # checks the daily trigger time
     now = datetime.now()
     if now.time() > time1 and now.time() < time2:
-        coins = coin_update()
-        calc_technicals(main_id)
+        sub = 'Summary'
+        coins = coin_update(sub)
+        sub = ''
+        calc_technicals(main_id, sub)
         print('Timed alert sent at ' + str(now))
-    
+        print(coins)
+
     # only send price-check alerts if set to True
     if alert_on_changes:
         # gets the price for your watch list for comparison
@@ -160,10 +196,15 @@ while run:
         # I'm tracking ETH, so I set a separate trigger (+/-$50) for ETH
         eth_chng = n_coins[main_id]['usd'] - coins[main_id]['usd']
         if abs(eth_chng) >= dlr_chng:
-            current = calc_technicals(main_id)
+            if (eth_chng) > 0:
+                sub = ' +'
+            else:
+                sub = ' -'
+            current = calc_technicals(main_id, sub)
             coins[main_id]['usd'] = current
             print(main_id + ' technicals ' + str(now))
-            
+            print(coins)
+
         # all other alerts based on a percent change
         for k, v in n_coins.items():
             p1 = coins[k]['usd']
@@ -174,13 +215,15 @@ while run:
                 t = str(k)
                 msg = parse_coins(n_coins)
                 if pct > 0:
-                    sub = symbol_dict[k] + ' Up'
+                    sub = symbol_dict[k] + ' +'
+                    sub1 = ' +'
                 else:
-                    sub = symbol_dict[k] + ' Down'
+                    sub = symbol_dict[k] + ' -'
+                    sub1 = ' -'
                 send_alert(msg, sub)
                 print(t + ' percent change ' + str(now))
-                calc_technicals(k)
+                calc_technicals(k, sub1)
                 coins = get_coins()
-
+                print(coins)
     # time to pause/sleep before running again
     time.sleep(100)
